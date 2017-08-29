@@ -1,16 +1,20 @@
+#!/usr/bin/env python2
+#
 # This script modifies the IRIS model files for Level-3 ICD.
+#
 
 import os
 import re
 
-
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 class Subsystem:
-    def __init__(self, dirname, abbr):
+    def __init__(self, dirname, abbr, title, description):
         self.components = []
         self.dirname = dirname
         self.abbr = abbr
+        self.title = title
+        self.description = description
 
     def addComponent(self, component):
         self.components.append(component)
@@ -20,16 +24,15 @@ class Component:
         self.name = name
         self.dirpath = dirpath
 
-d_s = {
-    'ici': 'ICI',
-    'drs': 'DRS',
-    'csro': 'CSRO',
-    'imager': 'IMG',
-    'ifs': 'IFS',
-    'sc': 'SC',
-    'el': 'EL',
-    }
-subsystems = [Subsystem(d, s) for d, s in d_s.iteritems()]
+subsystems = [
+    Subsystem('ici', 'ICI', 'IRIS Instrument Control Interface', ''),
+    Subsystem('drs', 'DRS', 'IRIS Data Reduction System', ''),
+    Subsystem('csro', 'CSRO', 'IRIS CSRO', ''),
+    Subsystem('imager', 'IMG', 'IRIS Imager', ''),
+    Subsystem('ifs', 'IFS', 'IRIS Integral Field Spectrograph', ''),
+    Subsystem('sc', 'SC', 'IRIS Science Cryostat', ''),
+    Subsystem('el', 'EL', 'IRIS Electronics', '')
+]
 
 # Obtain all component names
 for subsystem in subsystems:
@@ -78,3 +81,12 @@ for subsystem in subsystems:
                 f_out.close()
                 os.remove(filepath)
                 os.rename(temppath, filepath)
+
+# Generate subsystem-model.conf
+for subsystem in subsystems:
+    subsystem_model_path = os.path.join(subsystem.dirname, 'subsystem-model.conf')
+    f_out = open(subsystem_model_path, 'w')
+    f_out.write('subsystem = IRIS-' + subsystem.abbr + '\n')
+    f_out.write('title = "' + subsystem.title + '"\n')
+    f_out.write('modelVersion = "1.0"\n')
+    f_out.write('description = "' + subsystem.description + '"\n')
