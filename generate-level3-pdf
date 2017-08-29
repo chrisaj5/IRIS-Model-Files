@@ -1,0 +1,129 @@
+#!/bin/bash
+
+########################################################################################
+# This script generates Interface Control Documents in PDF.
+# If three or more subsystems are specified, all ICDs between each pair of subsystems
+# are generated at once with this script. In addition, because icd-db command only
+# generates ICD viewed from one side, this script generates two ICDs viewed from both
+# sides and concatenate two files into one.
+########################################################################################
+
+SCRIPT_DIR=$(cd -P $(dirname $0) && pwd -P)
+SCRIPT_NAME=$(basename $0)
+
+# Default arguments
+MONGO_HOST=localhost
+SUBSYSTEMS="IRIS-DRS IRIS-IMG IRIS-SC IRIS-CSRO IRIS-EL IRIS-ICI IRIS-IFS"
+OUTPUT_DIR=$SCRIPT_DIR/pdf
+
+# List of command line tools
+ICDDB_CMD=icd-db
+PDF_MERGER=pdfunite
+
+# List of temporary files
+TEMP_FILES=
+
+show_usage() {
+    echo "Usage: ${SCRIPT_NAME} [options]"
+    echo "This command generates Interface Control Documents in PDF."
+    echo "Note that PDF files in the output directory may be overwritten."
+    echo ""
+    echo "  -h, --host <hostname>         The host name where MongoDB is running. (default: localhost)."
+    echo "  -s, --subsystems <subsystems> The list of subsystem names separated by space. (default: all IRIS L3 subsystem)"
+    echo "  -o, --output <directory>      The directory to output PDF files. (default: $SCRIPT_DIR/pdf)"
+    echo "  --help                        Show this help and quits."
+}
+
+force_quit() {
+    cleanup
+    exit 1
+}
+
+cleanup() {
+    rm -f $TEMP_FILES
+}
+
+#######################################################
+# Quit this script immediately when SIGINT is received
+#######################################################
+trap 'force_quit' SIGHUP SIGINT SIGQUIT SIGKILL SIGABRT SIGTERM
+
+###################
+# parse arguments
+###################
+OPT=$(getopt -o h:s:o: --long host: --long subsystems: --long output: --long help -- "$@")
+if [ $? != 0 ]; then
+    show_usage
+    exit 1
+fi
+eval set -- "$OPT"
+
+while true; do
+    case "$1" in
+        --help)
+            shift 1
+            show_usage
+            exit 0
+            ;;
+        -h | --host)
+            MONGO_HOST=$2
+            shift 2
+            ;;
+        -s | --subsystems)
+            SUBSYSTEMS=$2
+            shift 2
+            ;;
+        -o | --output)
+            OUTPUT_DIR=$2
+            shift 2
+            ;;
+        --)
+            shift
+            break
+            ;;
+        *)
+            echo "Error on parsing the command line argument!" 1>&2
+            show_usage
+            exit 1
+            ;;
+    esac
+done
+
+#################################
+# generate the output directory
+#################################
+mkdir -p $OUTPUT_DIR
+
+################################################################
+# Generate PDF version of ICD using icd-db command line tools
+# between two systems. Because icd-db only generates a ICD PDF
+# from one side, two ICD PDFs are generated from both sides and
+# concatinate two PDFs into one.
+#################################################################
+for subsystem1 in $SUBSYSTEMS; do
+    duplicated=1
+    for subsystem2 in $SUBSYSTEMS; do
+        if [ $duplicated -eq 1 -a "$subsystem1" = "$subsystem2" ]; then
+            duplicated=0
+        elif [ $duplicated -eq 0 ]; then
+            echo "Generating ICD for $subsystem1 - $subsystem2..."
+            pdf_temp1=$OUTPUT_DIR/${subsystem1}_${subsystem2}.temp.pdf
+            pdf_temp2=$OUTPUT_DIR/${subsystem2}_${subsystem1}.temp.pdf
+            pdf_merged=$OUTPUT_DIR/${subsystem1}_${subsystem2}.pdf
+
+            TEMP_FILES="$TEMP_FILES $pdf_temp1"
+            $ICDDB_CMD --host $MONGO_HOST --subsystem $subsystem1 --target $subsystem2 --out $pdf_temp1
+
+            TEMP_FILES="$TEMP_FILES $pdf_temp2"
+            $ICDDB_CMD --host $MONGO_HOST --subsystem $subsystem2 --target $subsystem1 --out $pdf_temp2
+            
+            $PDF_MERGER $pdf_temp1 $pdf_temp2 $pdf_merged
+        fi
+    done
+done
+
+cleanup
+exit 0
+
+
+
