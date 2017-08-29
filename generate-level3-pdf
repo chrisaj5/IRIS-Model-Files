@@ -18,10 +18,6 @@ OUTPUT_DIR=$SCRIPT_DIR/pdf
 
 # List of command line tools
 ICDDB_CMD=icd-db
-PDF_MERGER=pdfunite
-
-# List of temporary files
-TEMP_FILES=
 
 show_usage() {
     echo "Usage: ${SCRIPT_NAME} [options]"
@@ -35,12 +31,7 @@ show_usage() {
 }
 
 force_quit() {
-    cleanup
     exit 1
-}
-
-cleanup() {
-    rm -f $TEMP_FILES
 }
 
 #######################################################
@@ -107,22 +98,13 @@ for subsystem1 in $SUBSYSTEMS; do
             duplicated=0
         elif [ $duplicated -eq 0 ]; then
             echo "Generating ICD for $subsystem1 - $subsystem2..."
-            pdf_temp1=$OUTPUT_DIR/${subsystem1}_${subsystem2}.temp.pdf
-            pdf_temp2=$OUTPUT_DIR/${subsystem2}_${subsystem1}.temp.pdf
-            pdf_merged=$OUTPUT_DIR/${subsystem1}_${subsystem2}.pdf
+            pdf_name=$OUTPUT_DIR/${subsystem1}_${subsystem2}.pdf
 
-            TEMP_FILES="$TEMP_FILES $pdf_temp1"
-            $ICDDB_CMD --host $MONGO_HOST --subsystem $subsystem1 --target $subsystem2 --out $pdf_temp1
-
-            TEMP_FILES="$TEMP_FILES $pdf_temp2"
-            $ICDDB_CMD --host $MONGO_HOST --subsystem $subsystem2 --target $subsystem1 --out $pdf_temp2
-            
-            $PDF_MERGER $pdf_temp1 $pdf_temp2 $pdf_merged
+            $ICDDB_CMD --host $MONGO_HOST --subsystem $subsystem1 --target $subsystem2 --out $pdf_name
         fi
     done
 done
 
-cleanup
 exit 0
 
 
