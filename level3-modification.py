@@ -5,6 +5,17 @@
 
 import os
 import re
+import sys
+
+
+if len(sys.argv) < 2:
+    print >> sys.stderr, "Specify the directory in which the modified model files to be generated."
+    sys.exit(1)
+
+output_dir = sys.argv[1]
+input_dir  = os.path.dirname(os.path.abspath(__file__))
+
+os.mkdir(output_dir)
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
@@ -36,12 +47,12 @@ subsystems = [
 
 # Obtain all component names
 for subsystem in subsystems:
-    files = os.listdir(subsystem.dirname)
+    files = os.listdir(os.path.join(input_dir, subsystem.dirname))
     component_dirs = [f for f in files if os.path.isdir(os.path.join(subsystem.dirname, f))]
 
     for component_dir in component_dirs:
-        component_model_path = os.path.join(subsystem.dirname, component_dir, 'component-model.conf')
-        if os.path.exists(component_model_path):
+        component_model_path = os.path.join(input_dir, subsystem.dirname, component_dir, 'component-model.conf')
+        if os.path.exists(os.path.join(input_dir, component_model_path)):
             f_in = open(component_model_path)
             contents = ''.join(f_in.readlines())
             m = re.match(r'subsystem\s*=\s*IRIS\s*\n\s*component\s*=\s*(\S+)\s*', contents)
@@ -58,6 +69,7 @@ for subsystem in subsystems:
         patterns.append((r,s))
 
 # Replace "subsystem = IRIS" in model files for Level-3 ICD.
+created_dirs = []
 for subsystem in subsystems:
     for component in subsystem.components:
         model_files = ['command-model.conf',
@@ -65,12 +77,17 @@ for subsystem in subsystems:
                        'publish-model.conf', 
                        'subscribe-model.conf']
         for model_file in model_files:
-            filepath = os.path.join(component.dirpath, model_file)
-            if os.path.exists(filepath):
-                temppath = os.path.join(component.dirpath, model_file + '.temp')
+            input_path = os.path.join(input_dir, component.dirpath, model_file)
+            if os.path.exists(input_path):
+                output_subdir = os.path.join(output_dir, component.dirpath)
+                if not output_subdir in created_dirs:
+                    os.makedirs(output_subdir)
+                    created_dirs.append(output_subdir)
 
-                f_in = open(filepath, 'r')
-                f_out = open(temppath, 'w')
+                output_path = os.path.join(output_subdir, model_file)
+
+                f_in = open(input_path, 'r')
+                f_out = open(output_path, 'w')
             
                 contents = ''.join(f_in.readlines())
                 for pattern in patterns:
@@ -79,12 +96,10 @@ for subsystem in subsystems:
 
                 f_in.close()
                 f_out.close()
-                os.remove(filepath)
-                os.rename(temppath, filepath)
 
 # Generate subsystem-model.conf
 for subsystem in subsystems:
-    subsystem_model_path = os.path.join(subsystem.dirname, 'subsystem-model.conf')
+    subsystem_model_path = os.path.join(output_dir, subsystem.dirname, 'subsystem-model.conf')
     f_out = open(subsystem_model_path, 'w')
     f_out.write('subsystem = IRIS-' + subsystem.abbr + '\n')
     f_out.write('title = "' + subsystem.title + '"\n')

@@ -6,7 +6,17 @@
 # are generated at once with this script. In addition, because icd-db command only
 # generates ICD viewed from one side, this script generates two ICDs viewed from both
 # sides and concatenate two files into one.
+#
+# Typical usage is:
+#   $ rm -rf ../temp
+#   $ ./level3-modification.py ../temp/
+#   $ icd-db --ingest ../temp
+#   $ ./generate_level3-pdf
+#
+# As a result, L3 ICD in PDF format will be generated in pdf/.
+#   
 ########################################################################################
+
 
 SCRIPT_DIR=$(cd -P $(dirname $0) && pwd -P)
 SCRIPT_NAME=$(basename $0)
